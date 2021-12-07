@@ -24,15 +24,15 @@ void BatchRenderingLayer::OnAttach()
 	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 
 	float vertices[] = {
-		-1.5f, -0.5f, 0.0f,
-		-0.5f, -0.5f, 0.0f,
-		-0.5f,  0.5f, 0.0f,
-		-1.5f,  0.5f, 0.0f,
+		-1.5f, -0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f,
+		-0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f,
+		-0.5f,  0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f,
+		-1.5f,  0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f,
 
-		 0.5f, -0.5f, 0.0f,
-		 1.5f, -0.5f, 0.0f,
-		 1.5f,  0.5f, 0.0f,
-		 0.5f,  0.5f, 0.0f
+		 0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f,
+		 1.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f,
+		 1.5f,  0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f,
+		 0.5f,  0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f
 	};
 
 	glCreateVertexArrays(1, &m_QuadVA);
@@ -43,7 +43,10 @@ void BatchRenderingLayer::OnAttach()
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
 	glEnableVertexArrayAttrib(m_QuadVB, 0);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 7 * sizeof(float), 0);
+
+	glEnableVertexArrayAttrib(m_QuadVB, 1);
+	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 7 * sizeof(float), (const void*)12);
 
 	uint32_t indices[] = {
 		0,1,2,2,3,0,
@@ -71,12 +74,6 @@ static void SetUniformMat4(uint32_t shader, const char* name, const glm::mat4& m
 	glUniformMatrix4fv(loc, 1, GL_FALSE, glm::value_ptr(matrix));
 }
 
-static void SetUniform4fv(uint32_t shader, const char* name, const glm::vec4& matrix)
-{
-	int loc = glGetUniformLocation(shader, name);
-	glUniform4fv(loc, 1, glm::value_ptr(matrix));
-}
-
 void BatchRenderingLayer::OnUpdate(Timestep ts)
 {
 	m_CameraController.OnUpdate(ts);
@@ -84,8 +81,6 @@ void BatchRenderingLayer::OnUpdate(Timestep ts)
 	glClear(GL_COLOR_BUFFER_BIT);
 
 	glUseProgram(m_Shader->GetRendererID());
-
-	SetUniform4fv(m_Shader->GetRendererID(), "u_Color", m_SquareColor);
 
 	SetUniformMat4(m_Shader->GetRendererID(), "u_ViewProj", m_CameraController.GetCamera().GetViewProjectionMatrix());
 
