@@ -12,22 +12,20 @@ BatchRenderingLayer::~BatchRenderingLayer()
 {
 }
 
+struct Vec2 { float x, y; };
+struct Vec3 { float x, y, z; };
+struct Vec4 { float x, y, z, w; };
+
+struct Vertex
+{
+	Vec3 Position;
+	Vec4 Color;
+	Vec2 TexCoords;
+	float TexID;
+};
+
 static GLuint LoadTexture(const std::string& path)
 {
-
-	///*STBI_grey = 1,
-	//	STBI_grey_alpha = 2,
-	//	STBI_rgb = 3,
-	//	STBI_rgb_alpha = 4*/
-	//	//STBI_rgb_alpha = 4*/
-	//int alphaType = 4;
-	//int format = GL_RGBA;
-	//int internalFormat = GL_RGBA8;
-	//if (path == "assets/img/Cherno.pnga") {
-	//	alphaType = 3;
-	//	format = GL_RGB;
-	//	internalFormat = GL_RGB8;
-	//}
 	int w, h, bits;
 	stbi_set_flip_vertically_on_load(1);
 	auto* pixels = stbi_load(path.c_str(), &w, &h, &bits, STBI_rgb_alpha);
@@ -64,36 +62,24 @@ void BatchRenderingLayer::OnAttach()
 
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
-	float vertices[] = {
-		-1.5f, -0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,	0.0f,
-		-0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f,	0.0f,
-		-0.5f,  0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f,	0.0f,
-		-1.5f,  0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f,	0.0f,
-
-		 0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,	1.0f,
-		 1.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f,	1.0f,
-		 1.5f,  0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f,	1.0f,
-		 0.5f,  0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f,	1.0f
-	};
-
 	glCreateVertexArrays(1, &m_QuadVA);
 	glBindVertexArray(m_QuadVA);
 
 	glCreateBuffers(1, &m_QuadVB);
 	glBindBuffer(GL_ARRAY_BUFFER, m_QuadVB);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * 1000, nullptr, GL_DYNAMIC_DRAW);
 
 	glEnableVertexArrayAttrib(m_QuadVB, 0);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 10 * sizeof(float), 0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (const void*)offsetof(Vertex, Position));
 
 	glEnableVertexArrayAttrib(m_QuadVB, 1);
-	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 10 * sizeof(float), (const void*)12);
+	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (const void*)offsetof(Vertex, Color));
 
 	glEnableVertexArrayAttrib(m_QuadVB, 2);
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 10 * sizeof(float), (const void*)28);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (const void*)offsetof(Vertex, TexCoords));
 
 	glEnableVertexArrayAttrib(m_QuadVB, 3);
-	glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, 10 * sizeof(float), (const void*)36);
+	glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(Vertex), (const void*)offsetof(Vertex, TexID));
 
 	uint32_t indices[] = {
 		0,1,2,2,3,0,
@@ -125,9 +111,64 @@ static void SetUniformMat4(uint32_t shader, const char* name, const glm::mat4& m
 	glUniformMatrix4fv(loc, 1, GL_FALSE, glm::value_ptr(matrix));
 }
 
+std::array<Vertex, 4> CreateQuad(float x, float y, float textureID)
+{
+	float size = 1.0f;
+	Vertex v0;
+	v0.Position = { x, y, 0.0f };
+	v0.Color = { 0.18f, 0.6f, 0.96f, 1.0f };
+	v0.TexCoords = { 0.0f, 0.0f };
+	v0.TexID = textureID;
+
+	Vertex v1;
+	v1.Position = { x + size, y, 0.0f };
+	v1.Color = { 0.18f, 0.6f, 0.96f, 1.0f };
+	v1.TexCoords = { 1.0f, 0.0f };
+	v1.TexID = textureID;
+
+	Vertex v2;
+	v2.Position = { x + size , y + size, 0.0f };
+	v2.Color = { 0.18f, 0.6f, 0.96f, 1.0f };
+	v2.TexCoords = { 1.0f, 1.0f };
+	v2.TexID = textureID;
+
+	Vertex v3;
+	v3.Position = { x, y + size, 0.0f };
+	v3.Color = { 0.18f, 0.6f, 0.96f, 1.0f };
+	v3.TexCoords = { 0.0f, 1.0f };
+	v3.TexID = textureID;
+
+	return { v0, v1, v2, v3 };
+}
+
 void BatchRenderingLayer::OnUpdate(Timestep ts)
 {
 	m_CameraController.OnUpdate(ts);
+
+
+	// Set dynamic vertex buffer
+	/*float vertices[] = {
+		-1.5f, -0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,	0.0f,
+		-0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f,	0.0f,
+		-0.5f,  0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f,	0.0f,
+		-1.5f,  0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f,	0.0f,
+
+		 0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,	1.0f,
+		 1.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f,	1.0f,
+		 1.5f,  0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f,	1.0f,
+		 0.5f,  0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f,	1.0f
+	};*/
+
+	auto q0 = CreateQuad(m_QuadOnePosition[0], m_QuadOnePosition[1], 0.0f);
+	auto q1 = CreateQuad(m_QuadTwoPosition[0], m_QuadTwoPosition[1], 1.0f);
+
+	Vertex vertices[8];
+	memcpy(vertices, q0.data(), q0.size() * sizeof(Vertex));
+	memcpy(vertices + q0.size(), q1.data(), q1.size() * sizeof(Vertex));
+
+	glBindBuffer(GL_ARRAY_BUFFER, m_QuadVB);
+	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
+	
 
 	glClear(GL_COLOR_BUFFER_BIT);
 
@@ -145,4 +186,8 @@ void BatchRenderingLayer::OnUpdate(Timestep ts)
 void BatchRenderingLayer::OnImGuiRender()
 {
 	// ImGui here
+	ImGui::Begin("Controls");
+	ImGui::DragFloat2("Quad 1 Position", m_QuadOnePosition, 0.1f);
+	ImGui::DragFloat2("Quad 2 Position", m_QuadTwoPosition, 0.1f);
+	ImGui::End();
 }
