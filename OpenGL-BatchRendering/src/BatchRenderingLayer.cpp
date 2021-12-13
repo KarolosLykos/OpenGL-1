@@ -62,12 +62,16 @@ void BatchRenderingLayer::OnAttach()
 
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
+	const size_t MaxQuadCount = 1000;
+	const size_t MaxVertexCount = MaxQuadCount * 4;
+	const size_t MaxIndexCount = MaxQuadCount * 6;
+
 	glCreateVertexArrays(1, &m_QuadVA);
 	glBindVertexArray(m_QuadVA);
 
 	glCreateBuffers(1, &m_QuadVB);
 	glBindBuffer(GL_ARRAY_BUFFER, m_QuadVB);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * 1000, nullptr, GL_DYNAMIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, MaxVertexCount * sizeof(Vertex), nullptr, GL_DYNAMIC_DRAW);
 
 	glEnableVertexArrayAttrib(m_QuadVB, 0);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (const void*)offsetof(Vertex, Position));
@@ -81,10 +85,25 @@ void BatchRenderingLayer::OnAttach()
 	glEnableVertexArrayAttrib(m_QuadVB, 3);
 	glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(Vertex), (const void*)offsetof(Vertex, TexID));
 
-	uint32_t indices[] = {
-		0,1,2,2,3,0,
-		4,5,6,6,7,4
-	};
+	//uint32_t indices[] = {
+	//	0,1,2,2,3,0,
+	//	4,5,6,6,7,4
+	//};
+
+	uint32_t indices[MaxIndexCount];
+	uint32_t offset = 0;
+	for (size_t i = 0; i < MaxIndexCount; i += 6)
+	{
+		indices[i + 0] = 0 + offset;
+		indices[i + 1] = 1 + offset;
+		indices[i + 2] = 2 + offset;
+
+		indices[i + 3] = 2 + offset;
+		indices[i + 4] = 3 + offset;
+		indices[i + 5] = 0 + offset;
+
+		offset += 4;
+	}
 
 	glCreateBuffers(1, &m_QuadIB);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_QuadIB);
@@ -111,34 +130,35 @@ static void SetUniformMat4(uint32_t shader, const char* name, const glm::mat4& m
 	glUniformMatrix4fv(loc, 1, GL_FALSE, glm::value_ptr(matrix));
 }
 
-std::array<Vertex, 4> CreateQuad(float x, float y, float textureID)
+static Vertex* CreateQuad(Vertex* target, float x, float y, float textureID)
 {
 	float size = 1.0f;
-	Vertex v0;
-	v0.Position = { x, y, 0.0f };
-	v0.Color = { 0.18f, 0.6f, 0.96f, 1.0f };
-	v0.TexCoords = { 0.0f, 0.0f };
-	v0.TexID = textureID;
 
-	Vertex v1;
-	v1.Position = { x + size, y, 0.0f };
-	v1.Color = { 0.18f, 0.6f, 0.96f, 1.0f };
-	v1.TexCoords = { 1.0f, 0.0f };
-	v1.TexID = textureID;
+	target->Position = { x, y, 0.0f };
+	target->Color = { 0.18f, 0.6f, 0.96f, 1.0f };
+	target->TexCoords = { 0.0f, 0.0f };
+	target->TexID = textureID;
+	target++;
 
-	Vertex v2;
-	v2.Position = { x + size , y + size, 0.0f };
-	v2.Color = { 0.18f, 0.6f, 0.96f, 1.0f };
-	v2.TexCoords = { 1.0f, 1.0f };
-	v2.TexID = textureID;
+	target->Position = { x + size, y, 0.0f };
+	target->Color = { 0.18f, 0.6f, 0.96f, 1.0f };
+	target->TexCoords = { 1.0f, 0.0f };
+	target->TexID = textureID;
+	target++;
 
-	Vertex v3;
-	v3.Position = { x, y + size, 0.0f };
-	v3.Color = { 0.18f, 0.6f, 0.96f, 1.0f };
-	v3.TexCoords = { 0.0f, 1.0f };
-	v3.TexID = textureID;
+	target->Position = { x + size , y + size, 0.0f };
+	target->Color = { 0.18f, 0.6f, 0.96f, 1.0f };
+	target->TexCoords = { 1.0f, 1.0f };
+	target->TexID = textureID;
+	target++;
 
-	return { v0, v1, v2, v3 };
+	target->Position = { x, y + size, 0.0f };
+	target->Color = { 0.18f, 0.6f, 0.96f, 1.0f };
+	target->TexCoords = { 0.0f, 1.0f };
+	target->TexID = textureID;
+	target++;
+
+	return target;
 }
 
 void BatchRenderingLayer::OnUpdate(Timestep ts)
@@ -159,15 +179,26 @@ void BatchRenderingLayer::OnUpdate(Timestep ts)
 		 0.5f,  0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f,	1.0f
 	};*/
 
-	auto q0 = CreateQuad(m_QuadOnePosition[0], m_QuadOnePosition[1], 0.0f);
-	auto q1 = CreateQuad(m_QuadTwoPosition[0], m_QuadTwoPosition[1], 1.0f);
+	uint32_t indexCount = 0;
+	std::array<Vertex, 1000> vertices;
+	Vertex* buffer = vertices.data();
+	for (int y = 0; y < 10; y++)
+	{
+		for (int x = 0; x < 10; x++)
+		{
+			buffer = CreateQuad(buffer, x, y, (x + y) % 2);
+			indexCount += 6;
+		}
+	}
 
-	Vertex vertices[8];
-	memcpy(vertices, q0.data(), q0.size() * sizeof(Vertex));
-	memcpy(vertices + q0.size(), q1.data(), q1.size() * sizeof(Vertex));
+
+	buffer = CreateQuad(buffer, m_QuadOnePosition[0], m_QuadOnePosition[1], 0.0f);
+	indexCount += 6;
+	buffer = CreateQuad(buffer, m_QuadTwoPosition[0], m_QuadTwoPosition[1], 1.0f);
+	indexCount += 6;
 
 	glBindBuffer(GL_ARRAY_BUFFER, m_QuadVB);
-	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
+	glBufferSubData(GL_ARRAY_BUFFER, 0, vertices.size() * sizeof(Vertex), vertices.data());
 	
 
 	glClear(GL_COLOR_BUFFER_BIT);
@@ -180,7 +211,7 @@ void BatchRenderingLayer::OnUpdate(Timestep ts)
 	SetUniformMat4(m_Shader->GetRendererID(), "u_Transform", glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)));
 
 	glBindVertexArray(m_QuadVA);
-	glDrawElements(GL_TRIANGLES, 12, GL_UNSIGNED_INT, nullptr);
+	glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, nullptr);
 }
 
 void BatchRenderingLayer::OnImGuiRender()
